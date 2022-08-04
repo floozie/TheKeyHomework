@@ -12,49 +12,67 @@ namespace Core
 {
     public class WordCounter
     {
+        private Core.WordpressApiResponseHelper wpApiResponseHelper = new Core.WordpressApiResponseHelper();
+        private Dictionary<string, Dictionary<string, int>> wordCountDict = new Dictionary<string, Dictionary<string, int>>();
         private int lastResposneHash = 0;
 
-        public bool areNewPostsAvailable(string rawWPApiResponse)
+        public bool areNewPostsAvailable(string responseHash)
         {
 
+            int actualResponseHash = getResponseHash(responseHash);
+            if (lastResposneHash != actualResponseHash)
+            {
+                lastResposneHash = actualResponseHash;
+                return true;
+            }
             return false;
         }
 
-        public int getHash(string rawWPApiResponse)
+        public int getResponseHash(string rawWPApiResponse)
         {
             return rawWPApiResponse.GetHashCode();
         }
 
-        public Dictionary<string, Dictionary<string, int>> getWordCountPerBlogPost(string rawWPApiResponse)
+        public Dictionary<string, Dictionary<string, int>> getWordCountPerNewBlogPost(string json)
         {
-            return new Dictionary<string, Dictionary<string, int>>();
+            Dictionary<string, Dictionary<string, int>> newWordCountDict = new Dictionary<string, Dictionary<string, int>>();
+            JArray jsonArray = JArray.Parse(json);
+            foreach (JObject jsonObject in jsonArray)
+            {
+                string htmlEncodedTitle = jsonObject["title"]["rendered"].ToString();
+                string cleanTextTitle = wpApiResponseHelper.getCleanText(htmlEncodedTitle);
+                if (!wordCountDict.ContainsKey(cleanTextTitle) && !newWordCountDict.ContainsKey(cleanTextTitle))
+                {
+                    string htmlEncodedContent = jsonObject["content"]["rendered"].ToString();
+                    string cleanTextContent = wpApiResponseHelper.getCleanText(htmlEncodedContent);
+                    Dictionary<string, int> wordCounts = getWordCount(cleanTextContent);
+                    newWordCountDict.Add(cleanTextTitle, wordCounts);
+                    wordCountDict.Add(cleanTextTitle, wordCounts);
+                }
+            }
+            return newWordCountDict;
         }
 
         public Dictionary<string, int> getWordCount(string cleanTextContent)
         {
-            return new Dictionary<string, int>();
-        }
-
-        public string getRawResponseFromWPApi(string requestUri)
-        {
-            string completeResponse = "";
-            var httpWebRequest = (HttpWebRequest)WebRequest.Create(requestUri);
-            httpWebRequest.ContentType = "application/json";
-            var httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-
-            using (
-                var streamReader =
-                    new StreamReader(httpResponse.GetResponseStream())
-            )
+            Dictionary<string, int> wordCountDict = new Dictionary<string, int>();
+            string[] words = cleanTextContent.Split(' ');
+            foreach (string word in words)
             {
-                string line = "";
-
-                while ((line = streamReader.ReadLine()) != null)
+                string lowerWord = word.Trim().ToLower();
+                if (lowerWord.Length > 1) // German language has no words only one character long
                 {
-                    completeResponse += line;
+                    if (wordCountDict.ContainsKey(lowerWord))
+                    {
+                        wordCountDict[lowerWord]++;
+                    }
+                    else
+                    {
+                        wordCountDict.Add(lowerWord, 1);
+                    }
                 }
             }
-            return completeResponse;
+            return wordCountDict;
         }
     }
 }
