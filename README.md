@@ -16,12 +16,14 @@ The project surely also works with .NET 5 but since my environment was already r
 ### Start Unittests:
 
 * Browse to the 'Homwork' Folder in your local git repository
+* Type: dotnet restore to the command line to restore missing nuget packages (xunit, NewtownsoftJson)
 * Type: dotnet test to the command line
 ![](images/runUnitTests.PNG)
 
 ### Start backend websocket server and server that hosts the frontend 
 
 * Browse to the 'Homwork/WebSocketServer' Folder in your local git repository
+* Type: dotnet restore to the command line to restore missing nuget packages (NewtownsoftJson)
 * Type: dotnet test to the command line
 * Open a web browser and type 'http://localhost:50942' as the URL
 ![](images/runProject.PNG)
