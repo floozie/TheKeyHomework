@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 using Core;
@@ -156,6 +157,87 @@ namespace Core_Unittest
             Assert.Equal(decoded, compare);
 
         }
+
+        [Fact]
+        public void getWordCountTest()
+        {
+            Core.WordCounter wordCounter = new Core.WordCounter();
+            Dictionary<string, int> wordcountData = wordCounter.getWordCount("eins zwei drei zwei drei drei a b c dreiminuszwei");
+            Dictionary<string, int> wordcountExpectedData = new Dictionary<string, int>();
+            wordcountExpectedData.Add("eins",1);
+            wordcountExpectedData.Add("zwei",2);
+            wordcountExpectedData.Add("drei",3);
+            wordcountExpectedData.Add("dreiminuszwei",1);
+            Assert.Equal(wordcountData, wordcountExpectedData);
+
+            wordcountData = wordCounter.getWordCount("Eins Zwei drei zwei Drei drei a B c Dreiminuszwei");
+            Assert.Equal(wordcountData, wordcountExpectedData);
+        }
+
+        [Fact]
+        public void getWordCountPerNewBlogPostTest()
+        {
+            Core.WordCounter wordCounter = new Core.WordCounter();
+            Dictionary<string, Dictionary<string, int>> wordCountPerNewBlogPostData = wordCounter.getWordCountPerNewBlogPost("[{\"id\":16216,\"title\":{\"rendered\":\"Aktuelle Informationen zur Einreise nach Kanada\"},\"content\":{\"rendered\":\"<h1><strong>Aktuelle Informationen zur Einreise nach Kanada</strong></h1>\n<p>Die f\u00fcr Kanada grunds\u00e4tzlich bestehende Einreisesperre wurde f\u00fcr vollst\u00e4ndig Geimpfte aufgehoben.\"}}]");
+            Dictionary<string, int> wordcountExpectedData = new Dictionary<string, int>();
+            wordcountExpectedData.Add("aktuelle",1);
+            wordcountExpectedData.Add("informationen",1);
+            wordcountExpectedData.Add("zur",1);
+            wordcountExpectedData.Add("einreise",1);
+            wordcountExpectedData.Add("nach",1);
+            wordcountExpectedData.Add("kanada",2);
+            wordcountExpectedData.Add("die",1);
+            wordcountExpectedData.Add("für",2);
+            wordcountExpectedData.Add("grundsätzlich",1);
+            wordcountExpectedData.Add("bestehende",1);
+            wordcountExpectedData.Add("einreisesperre",1);
+            wordcountExpectedData.Add("wurde",1);
+            wordcountExpectedData.Add("vollständig",1);
+            wordcountExpectedData.Add("geimpfte",1);
+            wordcountExpectedData.Add("aufgehoben",1);
+            Assert.Equal(wordcountExpectedData, wordCountPerNewBlogPostData["Aktuelle Informationen zur Einreise nach Kanada"]);
+        }
+
+        [Fact]
+        public void simulateOnlySendingNewPostData()
+        {
+            // As there is no write access to the wordpress page, the functionality of "new posts will result a frontendupdate" cant be tested.
+            // To be pretty confident that the functionality works it uses this simulation scenario 
+            string jsonFileContainingOnePlogPost = "WPApiResponse3Assert.txt";
+            string jsonfileContainingAllPlogPosts = "WPApiResponse1Assert.txt";
+            string jsonDataContainingOneBlogPost = getDataFromFile(jsonFileContainingOnePlogPost); 
+            string jsonDataContainingAllBlogPosts = getDataFromFile(jsonfileContainingAllPlogPosts); 
+            
+            // Here its checking if the json contains new posts compared to the internal wordcounter data
+            // then it parses the json containing one blogpost into the wordcounter data, returns the word count map that should contain one blogpost dictionary
+            Core.WordCounter wordCounter = new Core.WordCounter();
+            Assert.True(wordCounter.areNewPostsAvailable(jsonFileContainingOnePlogPost));
+            Dictionary<string, Dictionary<string, int>> wordCountPerNewBlogPostDataSingle = wordCounter.getWordCountPerNewBlogPost(jsonDataContainingOneBlogPost);
+            Assert.Single(wordCountPerNewBlogPostDataSingle);
+
+            // Then it checks that the same json data does not contain new information -> no update of frontend would be needed
+            // Nevertheless calling  getWordCountPerNewBlogPost for the same wordCounter object should not return data
+            Assert.False(wordCounter.areNewPostsAvailable(jsonFileContainingOnePlogPost));
+            Dictionary<string, Dictionary<string, int>> wordCountPerNewBlogPostDataEmpty = wordCounter.getWordCountPerNewBlogPost(jsonDataContainingOneBlogPost);
+            Assert.Empty(wordCountPerNewBlogPostDataEmpty);
+            
+            // Now its simulating a need to update frontend scenario as new posts are available. Json with full 10 posts is passed as an argument
+            // It will return the data of new posts. Its 10 posts in total, as already one has been consumed it only returns the 9 new blogposts as the result 
+            Assert.True(wordCounter.areNewPostsAvailable(jsonDataContainingAllBlogPosts));
+            Dictionary<string, Dictionary<string, int>> wordCountPerNewBlogPostDataAllButSingle = wordCounter.getWordCountPerNewBlogPost(jsonDataContainingAllBlogPosts);
+            Assert.Equal(9,wordCountPerNewBlogPostDataAllButSingle.Count);
+
+            // Probe: create a fresh wordCounetr object and again json with full 10 posts is passed as an argument
+            // This should now return all 10 posts. 1 post result + (full posts result after 1 post result on same wordcounter object) = full posts result with fresh wordCounter object 
+            Core.WordCounter freshwordCounter = new Core.WordCounter();
+
+            Assert.True(freshwordCounter.areNewPostsAvailable(jsonDataContainingAllBlogPosts));
+            Dictionary<string, Dictionary<string, int>> wordCountPerNewBlogPostDataAll = freshwordCounter.getWordCountPerNewBlogPost(jsonDataContainingAllBlogPosts);
+            Assert.Equal(wordCountPerNewBlogPostDataSingle.Count+wordCountPerNewBlogPostDataAllButSingle.Count,wordCountPerNewBlogPostDataAll.Count);
+
+        }
+
+
 
         private string getDataFromFile(string filename)
         {
